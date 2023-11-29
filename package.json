@@ -4,6 +4,7 @@
   "description": "An web based task management application api",
   "main": "index.js",
   "scripts": {
+    "prestart": "npm install",
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
