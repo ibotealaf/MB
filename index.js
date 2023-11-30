@@ -1,52 +1,17 @@
 import express from 'express';
-import crypto, { scrypt } from 'crypto';
+import crypto from 'crypto';
+import { MongoClient } from 'mongodb';
+
+const hash = encryption();
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017';
+const PORT = process.env.PORT || 6000;
+
+const mongoClient = new MongoClient(MONGODB_URI);
+await mongoClient.connect();
+const db = mongoClient.db('master_backend');
+const collections = db.collection('tasks');
 
 const app = express();
-const PORT = 6000;
-const hash = encryption();
-const inMemoryDb = [
-    {
-        name: 'test1',
-        email: 'test1@gmail.com',
-        password: 'test1',
-        tasks: [
-            {
-                id: 1,
-                title: 'test task creation 1',
-                description: 'test that a task can be created by test user 1',
-                dueDate: new Date().toLocaleString(),
-                status: false,
-            },
-            {
-                id: 2,
-                title: 'test task retrieval 1',
-                description: 'test that a task can be retrieved by test user 1',
-                dueDate: new Date().toLocaleString(),
-                status: false,
-            },
-        ],
-    },
-    {
-        name: 'test2',
-        email: 'test2@gmail.com',
-        password: 'test2',
-        tasks: [
-            {
-                title: 'test task creation 2',
-                description: 'test that a task can be created by test user 2',
-                dueDate: new Date().toLocaleString(),
-                status: true,
-            },
-            {
-                title: 'test task retrieval 2',
-                description: 'test that a task can be retrieved by test user 2',
-                dueDate: new Date().toLocaleString(),
-                status: true,
-            },
-        ],
-    },
-];
-
 app.set('x-powered-by', '');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -58,7 +23,7 @@ app.use('/tasks', detokenize);
  * @route {host-url}/register
  * @api public
  */
-app.post('/register', function (request, response) {
+app.post('/register', async function (request, response) {
     const { name, email, password } = request.body;
     if (!(email && password)) {
         return response.status(422).json({
@@ -73,7 +38,8 @@ app.post('/register', function (request, response) {
         password,
         tasks: [],
     };
-    inMemoryDb.push(newUser);
+    const user = await collections.insertOne(newUser);
+    console.log(user);
 
     const userData = Object.assign({}, newUser);
     Object.defineProperty(userData, 'token', {
@@ -102,9 +68,7 @@ app.post('/register', function (request, response) {
 app.post('/login', async function (request, response) {
     const { email, password } = request.body;
 
-    const user = inMemoryDb.find(function getUser(user) {
-        return user.email == email && user.password == password;
-    });
+    const user = await collections.findOne({ email });
 
     if (!user) {
         return response.status(422).json({
@@ -133,7 +97,7 @@ app.post('/login', async function (request, response) {
  * @route {host-url}/task
  * @api public
  */
-app.get('/tasks', function (request, response) {
+app.get('/tasks', async function (request, response) {
     response.status(200).json({
         status: true,
         message: 'Retrieval successful',
@@ -148,11 +112,11 @@ app.get('/tasks', function (request, response) {
  * @api public
  */
 app.get('/tasks/:taskId', function (request, response) {
-    const formattedTaskId = Number(request.params.taskId);
+    const taskId = request.params.taskId;
     const user = request.user;
 
     const task = user.tasks.find(function getTask(task) {
-        return task.id == formattedTaskId;
+        return task.id == taskId;
     });
     if (!task) {
         return response.status(404).json({
@@ -177,7 +141,7 @@ app.get('/tasks/:taskId', function (request, response) {
  * @route {host-url}/tasks
  * @api public
  */
-app.post('/tasks', function (request, response) {
+app.post('/tasks', async function (request, response) {
     let { title, description, dueDate } = request.body;
     const user = request.user;
 
@@ -205,6 +169,16 @@ app.post('/tasks', function (request, response) {
     };
     user.tasks.push(newTask);
 
+    try {
+        const updatedUser = await collections.updateOne(
+            { email: user.email },
+            { $set: { tasks: user.tasks } }
+        );
+    } catch (err) {
+        console.error(err);
+        return response.status(500).end();
+    }
+
     response.status(201).json({
         status: true,
         message: 'Task successfully created',
@@ -217,13 +191,13 @@ app.post('/tasks', function (request, response) {
  * @method  PUT
  * @route {host-url}/tasks/{id}
  */
-app.put('/tasks/:taskId', function (request, response) {
-    const formattedTaskId = Number(request.params.taskId);
+app.put('/tasks/:taskId', async function (request, response) {
+    const taskId = request.params.taskId;
     const { title, description, dueDate, status } = request.body;
 
     const user = request.user;
     const task = user.tasks.find(function getTask(task) {
-        return task.id == formattedTaskId;
+        return task.id == taskId;
     });
     if (!task) {
         return response.status(404).json({
@@ -237,6 +211,16 @@ app.put('/tasks/:taskId', function (request, response) {
     if (description) task.description = description;
     if (dueDate) task.dueDate = dueDate;
     if (status) task.status = !task.status;
+
+    try {
+        await collections.updateOne(
+            { email: user.email },
+            { $set: { tasks: user.tasks } }
+        );
+    } catch (err) {
+        console.error(err);
+        return response.status(500).end();
+    }
 
     response.status(202).json({
         status: true,
@@ -253,12 +237,12 @@ app.put('/tasks/:taskId', function (request, response) {
  * @route {host-url}/tasks/{id}
  * @api public
  */
-app.delete('/tasks/:taskId', function (request, response) {
-    const formattedTaskId = Number(request.params.taskId);
+app.delete('/tasks/:taskId', async function (request, response) {
+    const taskId = request.params.taskId;
 
     let user = request.user;
     let task = user.tasks.find(function getTask(task) {
-        return task.id == formattedTaskId;
+        return task.id == taskId;
     });
     if (!task) {
         return response.status(404).json({
@@ -272,13 +256,23 @@ app.delete('/tasks/:taskId', function (request, response) {
         return t.id != task.id;
     });
 
+    try {
+        await collections.updateOne(
+            { email: user.email },
+            { $set: { tasks: user.tasks } }
+        );
+    } catch (err) {
+        console.error(err);
+        return response.status(500).end();
+    }
+
     response.status(204).json({
         status: true,
         message: 'Deleted successfully',
     });
 });
 
-app.listen(PORT, () => console.log(`server is running`));
+app.listen(PORT, () => console.log(`server is running on ${PORT}`));
 
 function generateId() {
     return Math.floor(Math.random() * 1000);
@@ -316,7 +310,7 @@ function encryption() {
     };
 }
 
-function detokenize(request, response, next) {
+async function detokenize(request, response, next) {
     const auth = request.headers.authorization;
 
     if (!(auth && auth.startsWith('Bearer'))) {
@@ -330,8 +324,7 @@ function detokenize(request, response, next) {
 
     try {
         const payload = hash.decrypt(token);
-        const user = inMemoryDb.find((user) => user.email == payload);
-
+        const user = await collections.findOne({ email: payload });
         if (!user) {
             return response.status(401).json({
                 status: false,
