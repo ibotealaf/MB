@@ -9,7 +9,6 @@ const PORT = process.env.PORT || 6000;
 const mongoClient = new MongoClient(MONGODB_URI);
 await mongoClient.connect();
 const db = mongoClient.db('master_backend');
-const collections = db.collection('tasks');
 
 const app = express();
 app.set('x-powered-by', '');
@@ -38,7 +37,7 @@ app.post('/register', async function (request, response) {
         password,
         tasks: [],
     };
-    const user = await collections.insertOne(newUser);
+    const user = await db.collection('tasks').insertOne(newUser);
     console.log(user);
 
     const userData = Object.assign({}, newUser);
@@ -68,9 +67,9 @@ app.post('/register', async function (request, response) {
 app.post('/login', async function (request, response) {
     const { email, password } = request.body;
 
-    const user = await collections.findOne({ email });
+    const user = await db.collection('tasks').findOne({ email });
 
-    if (!user) {
+    if (!(user && user.password == password)) {
         return response.status(422).json({
             status: false,
             message: 'Invalid email or password',
@@ -170,10 +169,9 @@ app.post('/tasks', async function (request, response) {
     user.tasks.push(newTask);
 
     try {
-        const updatedUser = await collections.updateOne(
-            { email: user.email },
-            { $set: { tasks: user.tasks } }
-        );
+        const updatedUser = await db
+            .collection('tasks')
+            .updateOne({ email: user.email }, { $set: { tasks: user.tasks } });
     } catch (err) {
         console.error(err);
         return response.status(500).end();
@@ -213,10 +211,9 @@ app.put('/tasks/:taskId', async function (request, response) {
     if (status) task.status = !task.status;
 
     try {
-        await collections.updateOne(
-            { email: user.email },
-            { $set: { tasks: user.tasks } }
-        );
+        await db
+            .collection('tasks')
+            .updateOne({ email: user.email }, { $set: { tasks: user.tasks } });
     } catch (err) {
         console.error(err);
         return response.status(500).end();
@@ -257,10 +254,9 @@ app.delete('/tasks/:taskId', async function (request, response) {
     });
 
     try {
-        await collections.updateOne(
-            { email: user.email },
-            { $set: { tasks: user.tasks } }
-        );
+        await db
+            .collection('tasks')
+            .updateOne({ email: user.email }, { $set: { tasks: user.tasks } });
     } catch (err) {
         console.error(err);
         return response.status(500).end();
@@ -324,7 +320,7 @@ async function detokenize(request, response, next) {
 
     try {
         const payload = hash.decrypt(token);
-        const user = await collections.findOne({ email: payload });
+        const user = await db.collection('tasks').findOne({ email: payload });
         if (!user) {
             return response.status(401).json({
                 status: false,
