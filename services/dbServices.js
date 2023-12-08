@@ -6,7 +6,9 @@ export function findUserByEmail(email) {
 }
 
 export function findUserByEmailAndUpdateTask(email, tasks) {
-    return db.collection('Users').updateOne({ email }, { $set: { tasks } });
+    return db
+        .collection('Users')
+        .updateOne({ email }, { $set: { tasks } }, { upsert: 'after' });
 }
 
 export function saveNewUser(user) {
@@ -14,15 +16,17 @@ export function saveNewUser(user) {
 }
 
 export function findTaskById(id) {
-    return db.collection('Tasks').findOne({ _id: new ObjectId(taskId) });
+    return db.collection('Tasks').findOne({ _id: new ObjectId(id) });
 }
 
 export function findTaskByIdAndUpdateTask(id, task) {
-    return db
-        .collection('Tasks')
-        .updateOne({ _id: task._id }, { $set: { ...task } });
+    return db.collection('Tasks').updateOne({ _id: id }, { $set: { ...task } });
 }
 
 export function saveNewTask(task) {
-    return db.collection('Tasks').insertOne(newTask);
+    return db.collection('Tasks').insertOne(task);
+}
+
+export function findUserByEmailAndDelete(id) {
+    return db.collection('Tasks').findOneAndDelete({ _id: new ObjectId(id) });
 }

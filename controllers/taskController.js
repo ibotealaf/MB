@@ -1,8 +1,7 @@
-import db from '../config/dbConfig.js';
-import { ObjectId } from 'mongodb';
 import {
     findTaskById,
     findTaskByIdAndUpdateTask,
+    findUserByEmailAndDelete,
     findUserByEmailAndUpdateTask,
     saveNewTask,
 } from '../services/dbServices.js';
@@ -87,23 +86,17 @@ export async function createNewUserTask(request, response) {
         userId: user._id,
     };
 
-    try {
-        const savedTask = await saveNewTask(task);
-        user.tasks.push(savedTask.insertedId.toString());
+    const savedTask = await saveNewTask(task);
+    user.tasks.push(savedTask.insertedId.toString());
 
-        const updatedUser = await findUserByEmailAndUpdateTask(
-            email,
-            user.tasks
-        );
-    } catch (err) {
-        console.error(err);
-        return response.status(500).end();
-    }
-
+    const updatedUser = await findUserByEmailAndUpdateTask(
+        user.email,
+        user.tasks
+    );
     response.status(201).json({
         status: true,
         message: 'Task successfully created',
-        data: newTask,
+        data: task,
     });
 }
 
@@ -144,9 +137,6 @@ export async function updateUserTaskById(request, response) {
         if (status) task.status = !task.status;
 
         await findTaskByIdAndUpdateTask(task._id, task);
-        // await db
-        //     .collection('Tasks')
-        //     .updateOne({ _id: task._id }, { $set: { ...task } });
 
         response.status(202).json({
             status: true,
@@ -178,9 +168,7 @@ export async function deleteUserTaskById(request, response) {
         });
     }
     try {
-        const task = await db
-            .collection('Tasks')
-            .findOneAndDelete({ _id: new ObjectId(taskId) });
+        const task = await findUserByEmailAndDelete(taskId);
 
         if (!task) {
             return response.status(404).json({
@@ -201,14 +189,7 @@ export async function deleteUserTaskById(request, response) {
             return id != task._id.toString();
         });
 
-        const updatedUser = await db
-            .collection('Users')
-            .findOneAndUpdate(
-                { email: user.email },
-                { $set: { tasks: user.tasks } }
-            );
-
-        console.log(updatedUser);
+        await findUserByEmailAndUpdateTask(user.email, user.tasks);
 
         response.status(204).json({
             status: true,
