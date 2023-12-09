@@ -36,3 +36,7 @@ export async function detokenize(request, response, next) {
         });
     }
 }
+
+export function errorHandler(error, request, response, next) {
+    next(error);
+}
