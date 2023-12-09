@@ -1,4 +1,9 @@
-import { generateToken, modifyUserData } from '../utils/helper.js';
+import {
+    comparePassword,
+    encryptPassword,
+    generateToken,
+    modifyUserData,
+} from '../utils/helper.js';
 import { findUserByEmail, saveNewUser } from '../services/dbServices.js';
 
 export async function registerUser(request, response) {
@@ -11,57 +16,69 @@ export async function registerUser(request, response) {
         });
     }
 
-    const userExist = await findUserByEmail(email);
+    try {
+        const userExist = await findUserByEmail(email);
 
-    if (userExist) {
-        return response.status(409).json({
-            status: false,
-            message: 'Something went wrong when attempting to sign up',
-            error: 'Invalid sign up',
+        if (userExist) {
+            return response.status(409).json({
+                status: false,
+                message: 'Something went wrong when attempting to sign up',
+                error: 'Invalid sign up',
+            });
+        }
+
+        const newUser = {
+            name,
+            email,
+            password: await encryptPassword(password),
+            tasks: [],
+        };
+
+        console.log(newUser);
+        await saveNewUser(newUser);
+        const user = modifyUserData(newUser);
+
+        response.status(201).json({
+            status: true,
+            message: 'account has been created',
+            data: {
+                ...user,
+            },
         });
+    } catch (err) {
+        console.error(err);
     }
-
-    const newUser = {
-        name,
-        email,
-        password,
-        tasks: [],
-    };
-
-    await saveNewUser(newUser);
-    const user = modifyUserData(newUser);
-
-    response.status(201).json({
-        status: true,
-        message: 'account has been created',
-        data: {
-            ...user,
-        },
-    });
 }
 
 export async function loginUser(request, response) {
     const { email, password } = request.body;
 
-    const user = await findUserByEmail(email);
+    try {
+        const user = await findUserByEmail(email);
+        const verifyPassword = user
+            ? await comparePassword(password, user.password)
+            : null;
+        console.log('verify password', verifyPassword);
 
-    if (!(user && user.password == password)) {
-        return response.status(422).json({
-            status: false,
-            message: 'Invalid email or password',
-            error: 'Incorrect email or password',
+        if (!(user && verifyPassword)) {
+            return response.status(422).json({
+                status: false,
+                message: 'Invalid email or password',
+                error: 'Incorrect email or password',
+            });
+        }
+
+        let token = generateToken(user.email);
+
+        response.status(200).json({
+            status: true,
+            message: 'Login successful',
+            data: {
+                token,
+                name: user.name,
+            },
         });
+    } catch (err) {
+        console.error(err);
     }
-
-    let token = generateToken(user.email);
-
-    response.status(200).json({
-        status: true,
-        message: 'Login successful',
-        data: {
-            token,
-            name: user.name,
-            tasks: user.tasks,
-        },
-    });
 }

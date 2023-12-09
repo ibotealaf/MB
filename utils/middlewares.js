@@ -1,5 +1,5 @@
 import db from '../config/dbConfig.js';
-import hash from './hash.js';
+import { verifyToken } from './helper.js';
 
 export async function detokenize(request, response, next) {
     const auth = request.headers.authorization;
@@ -14,7 +14,8 @@ export async function detokenize(request, response, next) {
     const token = auth.split(' ')[1];
 
     try {
-        const payload = hash.decrypt(token);
+        const payload = verifyToken(token);
+        console.log(payload);
         const user = await db.collection('Users').findOne({ email: payload });
         if (!user) {
             return response.status(401).json({

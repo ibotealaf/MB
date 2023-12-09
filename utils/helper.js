@@ -1,4 +1,22 @@
+import bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
 import hash from './hash.js';
+import config from '../config/index.js';
+
+const jwtOptions = {
+    issuer: 'master_backend_task',
+    expiresIn: '3d',
+};
+
+export async function encryptPassword(data) {
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(data, salt);
+    return hash;
+}
+
+export function comparePassword(data, encryptedData) {
+    bcrypt.compare(data, encryptedData);
+}
 
 export function modifyUserData(data) {
     const user = Object.assign({}, data);
@@ -9,10 +27,15 @@ export function modifyUserData(data) {
         value: hash.encrypt(data.email),
     });
     delete user.password;
+    return user;
 }
 
 export function generateToken(payload) {
-    return hash.encrypt(payload);
+    return jwt.sign(payload, config.ACCESS_TOKEN, jwtOptions);
+}
+
+export function verifyToken(token) {
+    return jwt.verify(token, config.ACCESS_TOKEN, jwtOptions);
 }
 
 export function sevenDaysFromNow() {
