@@ -42,3 +42,10 @@ export async function detokenize(request, response, next) {
 export function errorHandler(error, request, response, next) {
     next(error);
 }
+
+export function unknownEndpoint(request, response, next) {
+    response.status(404).json({
+        status: false,
+        message: 'resource not found',
+    });
+}
