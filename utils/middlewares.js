@@ -1,4 +1,5 @@
 import db from '../config/dbConfig.js';
+import { findUserByEmail } from '../services/dbServices.js';
 import { verifyToken } from './helper.js';
 
 export async function detokenize(request, response, next) {
@@ -16,9 +17,7 @@ export async function detokenize(request, response, next) {
 
     try {
         const payload = verifyToken(token);
-        const user = await db
-            .collection('Users')
-            .findOne({ email: payload.email });
+        const user = await findUserByEmail(payload.email);
         if (!user) {
             return response.status(401).json({
                 status: false,
@@ -46,8 +45,14 @@ export function errorHandler(error, request, response, next) {
             message: 'Malformed token',
             error: 'invalid token',
         });
+    } else {
+        response.status(500).json({
+            status: false,
+            message: 'Something went wrong!',
+            error: 'Internal server error',
+        });
+        next(error);
     }
-    next(error);
 }
 
 export function unknownEndpoint(request, response, next) {

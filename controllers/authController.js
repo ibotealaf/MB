@@ -5,6 +5,7 @@ import {
     modifyUserData,
 } from '../utils/helper.js';
 import { findUserByEmail, saveNewUser } from '../services/dbServices.js';
+import db from '../config/dbConfig.js';
 
 export async function registerUser(request, response) {
     const { name, email, password } = request.body;
@@ -34,7 +35,6 @@ export async function registerUser(request, response) {
             tasks: [],
         };
 
-        console.log(newUser);
         await saveNewUser(newUser);
         const user = modifyUserData(newUser);
 
@@ -54,9 +54,13 @@ export async function loginUser(request, response) {
     const { email, password } = request.body;
 
     try {
-        const user = await findUserByEmail(email);
+        const { rows } = await db.query(
+            'SELECT * FROM Users WHERE email = $1',
+            [email]
+        );
+        const user = rows[0];
         const verifyPassword = user
-            ? await comparePassword(password, user.password)
+            ? await comparePassword(password, user?.password)
             : null;
 
         if (!(user && verifyPassword)) {

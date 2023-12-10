@@ -1,32 +1,53 @@
-import { ObjectId } from 'mongodb';
 import db from '../config/dbConfig.js';
 
-export function findUserByEmail(email) {
-    return db.collection('Users').findOne({ email });
-}
-
-export function findUserByEmailAndUpdateTask(email, tasks) {
-    return db
-        .collection('Users')
-        .updateOne({ email }, { $set: { tasks } }, { upsert: 'after' });
+export async function findUserByEmail(email) {
+    const result = await db.query(
+        'SELECT user_id, name, email FROM Users WHERE email = $1',
+        [email]
+    );
+    return result.rows[0];
 }
 
 export function saveNewUser(user) {
-    return db.collection('Users').insertOne(user);
+    return db.query(
+        'INSERT INTO Users(name, email, password) VALUES($1, $2, $3)',
+        [user.name, user.email, user.password]
+    );
 }
 
-export function findTaskById(id) {
-    return db.collection('Tasks').findOne({ _id: new ObjectId(id) });
+export async function findTaskById(taskId, userId) {
+    const result = await db.query(
+        'SELECT * FROM Tasks WHERE task_id = $1 AND user_id = $2',
+        [taskId, userId]
+    );
+    return result.rows[0];
 }
 
-export function findTaskByIdAndUpdateTask(id, task) {
-    return db.collection('Tasks').updateOne({ _id: id }, { $set: { ...task } });
+export function findTaskByIdAndUpdate(id, task) {
+    return db.query(
+        'UPDATE Tasks SET title = $2, description = $3, due_date = $4, status = $5 WHERE task_id = $1',
+        [id, task.title, task.description, task.due_date, task.status]
+    );
 }
 
 export function saveNewTask(task) {
-    return db.collection('Tasks').insertOne(task);
+    return db.query(
+        'INSERT INTO Tasks(title, description, due_date, status, user_id) VALUES($1, $2, $3, $4, $5)',
+        [task.title, task.description, task.dueDate, task.status, task.userId]
+    );
 }
 
-export function findUserByEmailAndDelete(id) {
-    return db.collection('Tasks').findOneAndDelete({ _id: new ObjectId(id) });
+export function findTaskIdAndDelete(taskId, userId) {
+    return db.query('DELETE FROM Tasks WHERE task_id = $1 AND user_id = $2', [
+        taskId,
+        userId,
+    ]);
+}
+
+export async function getTasksUserCreated(id) {
+    const result = await db.query(
+        'SELECT * FROM Tasks WHERE user_id = $1 ORDER BY due_date',
+        [id]
+    );
+    return result.rows;
 }

@@ -1,66 +1,43 @@
 import {
     findTaskById,
-    findTaskByIdAndUpdateTask,
-    findUserByEmailAndDelete,
-    findUserByEmailAndUpdateTask,
+    findTaskByIdAndUpdate,
+    findTaskIdAndDelete,
+    getTasksUserCreated,
     saveNewTask,
 } from '../services/dbServices.js';
 import { sevenDaysFromNow } from '../utils/helper.js';
 
-export function getAllUserTasks(request, response) {
+export async function getAllUserTasks(request, response) {
+    const result = await getTasksUserCreated(request.user.user_id);
+
     response.status(200).json({
         status: true,
         message: 'Retrieval successful',
-        data: { tasks: request.user.tasks },
+        data: result,
     });
 }
 
 export async function getUserTaskById(request, response) {
-    const taskId = request.params.taskId;
+    const taskId = Number(request.params.taskId);
     const user = request.user;
 
-    if (taskId.length < 24) {
-        return response.status(422).json({
+    const task = taskId ? await findTaskById(taskId, user.user_id) : null;
+
+    if (!task) {
+        return response.status(404).json({
             status: false,
-            message: 'Something went wrong when attempting to fetch task.',
-            error: 'Malformed task id',
+            message: 'Task not found',
+            error: `Task with ID ${request.params.taskId} does not exist in your tasks`,
         });
     }
 
-    try {
-        const task = await findTaskById(taskId);
-
-        if (!task) {
-            return response.status(404).json({
-                status: false,
-                message: 'Task not found',
-                error: `Task with ID ${taskId} does not exist in your tasks`,
-            });
-        }
-
-        if (!(task && task.userId.toString() == user._id)) {
-            return response.status(403).json({
-                status: false,
-                message: "You can't view this resource",
-                error: 'Permission denied',
-            });
-        }
-
-        response.status(200).json({
-            status: true,
-            message: 'Retrieval successful',
-            data: {
-                ...task,
-            },
-        });
-    } catch (err) {
-        console.error(err);
-        return response.status(500).json({
-            status: false,
-            message: 'Something went wrong!',
-            error: 'Internal server error',
-        });
-    }
+    response.status(200).json({
+        status: true,
+        message: 'Retrieval successful',
+        data: {
+            ...task,
+        },
+    });
 }
 
 export async function createNewUserTask(request, response) {
@@ -83,16 +60,11 @@ export async function createNewUserTask(request, response) {
         description,
         dueDate: dueDate ?? defaultDueDate,
         status: false,
-        userId: user._id,
+        userId: user.user_id,
     };
 
-    const savedTask = await saveNewTask(task);
-    user.tasks.push(savedTask.insertedId.toString());
+    await saveNewTask(task);
 
-    const updatedUser = await findUserByEmailAndUpdateTask(
-        user.email,
-        user.tasks
-    );
     response.status(201).json({
         status: true,
         message: 'Task successfully created',
@@ -101,102 +73,61 @@ export async function createNewUserTask(request, response) {
 }
 
 export async function updateUserTaskById(request, response) {
-    const taskId = request.params.taskId;
+    const taskId = Number(request.params.taskId);
     const { title, description, dueDate, status } = request.body;
     const user = request.user;
 
-    if (taskId.length < 24) {
-        return response.status(422).json({
+    const task = taskId ? await findTaskById(taskId, user.user_id) : null;
+
+    if (!task) {
+        return response.status(404).json({
             status: false,
-            message:
-                'Something went wrong. Task no longer exist or must have been deleted.',
-            error: 'Malformed task id',
+            message: 'Task does not exist or has been deleted',
+            error: `Task with ID ${request.params.taskId} does not exist in your tasks`,
         });
     }
-    try {
-        const task = await findTaskById(taskId);
 
-        if (!task) {
-            return response.status(404).json({
-                status: false,
-                message: 'Task does not exist or has been deleted',
-                error: `Task with ID ${taskId} does not exist in your tasks`,
-            });
-        }
-        if (!(task && task.userId.toString() == user._id)) {
-            return response.status(403).json({
-                status: false,
-                message: "You can't make modification to this resource",
-                error: 'Permission denied',
-            });
-        }
+    if (title) task.title = title;
+    if (description) task.description = description;
+    if (dueDate) task.due_date = dueDate;
+    if (status) task.status = !task.status;
 
-        if (title) task.title = title;
-        if (description) task.description = description;
-        if (dueDate) task.dueDate = dueDate;
-        if (status) task.status = !task.status;
+    const result = await findTaskByIdAndUpdate(taskId, task);
 
-        await findTaskByIdAndUpdateTask(task._id, task);
-
-        response.status(202).json({
-            status: true,
-            message: 'Updated successfully',
-            data: {
-                ...task,
-            },
-        });
-    } catch (err) {
-        console.error(err);
+    if (!result?.rowCount) {
         return response.status(500).json({
             status: false,
-            message: 'Something went wrong!',
-            error: 'Internal server error',
+            message: 'Something went wrong when attempting to save task',
         });
     }
+
+    response.status(202).json({
+        status: true,
+        message: 'Updated successfully',
+        data: {
+            ...task,
+        },
+    });
 }
 
 export async function deleteUserTaskById(request, response) {
-    const taskId = request.params.taskId;
+    const taskId = Number(request.params.taskId);
     let user = request.user;
 
-    if (taskId.length < 24) {
-        return response.status(422).json({
+    const result = taskId
+        ? await findTaskIdAndDelete(taskId, user.user_id)
+        : null;
+
+    if (!result?.rowCount) {
+        return response.status(404).json({
             status: false,
-            message:
-                'Something went wrong. Task no longer exist or must have been deleted.',
-            error: 'Malformed task id',
+            message: 'Task does not exist or has been deleted',
+            error: `Task with ID ${request.params.taskId} does not exist in your tasks`,
         });
     }
-    try {
-        const task = await findUserByEmailAndDelete(taskId);
 
-        if (!task) {
-            return response.status(404).json({
-                status: false,
-                message: 'Task does not exist or has been deleted',
-                error: `Task with ID ${taskId} does not exist in your tasks`,
-            });
-        }
-        if (!(task && task.userId.toString() == user._id)) {
-            return response.status(403).json({
-                status: false,
-                message: "You can't make modification to this resource",
-                error: 'Permission denied',
-            });
-        }
-
-        user.tasks = user.tasks.filter(function getTask(id) {
-            return id != task._id.toString();
-        });
-
-        await findUserByEmailAndUpdateTask(user.email, user.tasks);
-
-        response.status(204).json({
-            status: true,
-            message: 'Deleted successfully',
-        });
-    } catch (err) {
-        console.error(err);
-        return response.status(500).end();
-    }
+    response.status(204).json({
+        status: true,
+        message: 'Deleted successfully',
+    });
 }
