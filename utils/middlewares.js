@@ -40,6 +40,13 @@ export async function detokenize(request, response, next) {
 }
 
 export function errorHandler(error, request, response, next) {
+    if (error.name == 'JsonWebTokenError') {
+        return response.status(401).json({
+            status: false,
+            message: 'Malformed token',
+            error: 'invalid token',
+        });
+    }
     next(error);
 }
 
