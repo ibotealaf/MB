@@ -2,7 +2,8 @@ import db from '../config/dbConfig.js';
 import { verifyToken } from './helper.js';
 
 export async function detokenize(request, response, next) {
-    const auth = request.headers.authorization;
+    const auth =
+        request.headers.authorization || request.headers['Authorization'];
 
     if (!(auth && auth.startsWith('Bearer'))) {
         return response.status(401).json({
@@ -15,8 +16,9 @@ export async function detokenize(request, response, next) {
 
     try {
         const payload = verifyToken(token);
-        console.log(payload);
-        const user = await db.collection('Users').findOne({ email: payload });
+        const user = await db
+            .collection('Users')
+            .findOne({ email: payload.email });
         if (!user) {
             return response.status(401).json({
                 status: false,

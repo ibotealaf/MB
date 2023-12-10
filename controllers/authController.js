@@ -58,7 +58,6 @@ export async function loginUser(request, response) {
         const verifyPassword = user
             ? await comparePassword(password, user.password)
             : null;
-        console.log('verify password', verifyPassword);
 
         if (!(user && verifyPassword)) {
             return response.status(422).json({
@@ -68,13 +67,13 @@ export async function loginUser(request, response) {
             });
         }
 
-        let token = generateToken(user.email);
+        let accessToken = generateToken({ email: user.email });
 
         response.status(200).json({
             status: true,
             message: 'Login successful',
             data: {
-                token,
+                accessToken,
                 name: user.name,
             },
         });

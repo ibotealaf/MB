@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import hash from './hash.js';
 import config from '../config/index.js';
 
@@ -15,7 +15,7 @@ export async function encryptPassword(data) {
 }
 
 export function comparePassword(data, encryptedData) {
-    bcrypt.compare(data, encryptedData);
+    return bcrypt.compare(data, encryptedData);
 }
 
 export function modifyUserData(data) {
