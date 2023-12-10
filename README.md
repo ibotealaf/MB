@@ -7,7 +7,16 @@ project.
 
 ### Commands
 
--   git clone repo
--   `npm start`
+-   `git clone repo && cd repo` -> download & enter repo directory
+-   `npm start` -> start prod
+-   `npm run dev` -> start dev
 
 ### API endpoint
+
+-   `POST /api/auth/register` -> create new user
+-   `POST /api/auth/login` -> login user
+-   `POST /api/tasks` -> create new task
+-   `GET /api/tasks` -> fetch all users task
+-   `GET /api/tasks/{taskId}` -> fetch single task
+-   `PUT /api/tasks/{taskId}` -> update a task
+-   `DELETE /api/tasks/{taskId}` -> delete a task
